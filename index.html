@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Rarest & Least Protected Forests in Biodiversity Hotspots</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Source+Sans+3:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #080b0a;
+    --bg-panel: #0d1210;
+    --bg-card: #111916;
+    --border: rgba(160,210,160,0.08);
+    --border-hover: rgba(160,210,160,0.18);
+    --text-primary: #d8eed4;
+    --text-secondary: #8aa886;
+    --text-muted: #566e54;
+    --accent-green: #4ae68a;
+    --accent-red: #ff4757;
+    --accent-orange: #ff8844;
+    --accent-yellow: #f0c040;
+    --accent-blue: #5b9bf5;
+    --critical-glow: rgba(255,71,87,0.35);
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-body: 'Source Sans 3', 'Helvetica Neue', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* ─── Map ─── */
+  #map {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+
+  /* Override leaflet controls */
+  .leaflet-control-zoom a {
+    background: var(--bg-panel) !important;
+    color: var(--text-secondary) !important;
+    border-color: var(--border) !important;
+    width: 34px !important;
+    height: 34px !important;
+    line-height: 34px !important;
+    font-size: 16px !important;
+    transition: all 0.2s;
+  }
+  .leaflet-control-zoom a:hover {
+    background: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+  }
+  .leaflet-control-attribution {
+    background: rgba(8,11,10,0.8) !important;
+    color: var(--text-muted) !important;
+    font-size: 10px !important;
+    font-family: var(--font-body) !important;
+  }
+  .leaflet-control-attribution a { color: var(--text-secondary) !important; }
+
+  /* ─── Sidebar ─── */
+  #sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 380px;
+    height: 100vh;
+    z-index: 1000;
+    background: linear-gradient(180deg, rgba(10,15,12,0.97) 0%, rgba(13,18,16,0.98) 100%);
+    backdrop-filter: blur(24px);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+  }
+  #sidebar.collapsed { transform: translateX(-380px); }
+
+  #sidebar-toggle {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 1001;
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: rgba(13,18,16,0.95);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+  }
+  #sidebar-toggle:hover { background: var(--bg-card); border-color: var(--border-hover); color: var(--text-primary); }
+  #sidebar-toggle.shifted { left: 396px; }
+
+  .sidebar-header {
+    padding: 28px 24px 0;
+    flex-shrink: 0;
+  }
+
+  .sidebar-header .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .eyebrow-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent-red);
+    box-shadow: 0 0 8px var(--critical-glow);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { box-shadow: 0 0 8px var(--critical-glow); }
+    50% { box-shadow: 0 0 16px var(--critical-glow), 0 0 24px rgba(255,71,87,0.15); }
+  }
+
+  .sidebar-header h1 {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 900;
+    line-height: 1.15;
+    color: #eaf5e8;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+  .sidebar-header h1 em {
+    font-style: italic;
+    color: var(--accent-green);
+    font-weight: 700;
+  }
+
+  .sidebar-header .subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    margin-bottom: 20px;
+  }
+
+  /* Stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .stat-cell {
+    background: var(--bg-card);
+    padding: 12px 8px;
+    text-align: center;
+  }
+  .stat-cell:first-child { border-radius: 10px 0 0 10px; }
+  .stat-cell:last-child { border-radius: 0 10px 10px 0; }
+  .stat-val {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .stat-val.critical-val { color: var(--accent-red); }
+  .stat-label {
+    font-size: 9px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1.3;
+  }
+
+  /* Filters */
+  .filters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 0 24px;
+    margin-bottom: 14px;
+    flex-shrink: 0;
+  }
+  .filter-btn {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .filter-btn:hover { border-color: var(--border-hover); color: var(--text-secondary); }
+  .filter-btn.active {
+    background: rgba(74,230,138,0.08);
+    border-color: rgba(74,230,138,0.25);
+    color: var(--accent-green);
+  }
+  .filter-btn .count {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    opacity: 0.5;
+    margin-left: 3px;
+  }
+
+  /* Search */
+  .search-wrap {
+    padding: 0 24px;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+  .search-input {
+    width: 100%;
+    padding: 9px 14px 9px 36px;
+    font-family: var(--font-body);
+    font-size: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: rgba(17,25,22,0.6);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-input::placeholder { color: var(--text-muted); }
+  .search-input:focus { border-color: rgba(74,230,138,0.3); }
+  .search-icon {
+    position: absolute;
+    left: 36px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 14px;
+    pointer-events: none;
+  }
+
+  /* List */
+  .forest-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 16px 20px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(74,230,138,0.15) transparent;
+  }
+  .forest-list::-webkit-scrollbar { width: 5px; }
+  .forest-list::-webkit-scrollbar-track { background: transparent; }
+  .forest-list::-webkit-scrollbar-thumb { background: rgba(74,230,138,0.15); border-radius: 10px; }
+
+  .forest-card {
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 2px;
+    position: relative;
+  }
+  .forest-card:hover {
+    background: rgba(74,230,138,0.03);
+    border-color: var(--border);
+  }
+  .forest-card.active {
+    background: rgba(74,230,138,0.06);
+    border-color: rgba(74,230,138,0.15);
+  }
+  .forest-card .fc-name {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.3;
+    margin-bottom: 3px;
+  }
+  .forest-card .fc-hotspot {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .forest-card .fc-meta {
+    display: flex;
+    gap: 14px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+  .fc-meta span { color: var(--text-secondary); }
+  .fc-meta .val { color: var(--text-primary); font-weight: 500; }
+  .fc-meta .val.danger { color: var(--accent-red); }
+  .fc-meta .val.warning { color: var(--accent-orange); }
+
+  .forest-card .fc-tags {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+  .fc-tag {
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 8px;
+    letter-spacing: 0.03em;
+  }
+  .fc-tag.island { background: rgba(91,155,245,0.1); color: var(--accent-blue); border: 1px solid rgba(91,155,245,0.15); }
+  .fc-tag.no-prot { background: rgba(255,135,68,0.1); color: var(--accent-orange); border: 1px solid rgba(255,135,68,0.15); }
+  .fc-tag.critical { background: rgba(255,71,87,0.12); color: var(--accent-red); border: 1px solid rgba(255,71,87,0.2); }
+  .fc-tag.has-nat { background: rgba(74,230,138,0.08); color: var(--accent-green); border: 1px solid rgba(74,230,138,0.12); }
+
+  /* Vulnerability indicator bar */
+  .fc-bar-wrap {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    width: 3px;
+    height: 30px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.04);
+    overflow: hidden;
+  }
+  .fc-bar {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    border-radius: 2px;
+    transition: height 0.3s;
+  }
+
+  /* ─── Custom Leaflet Popup ─── */
+  .leaflet-popup-content-wrapper {
+    background: rgba(13,18,16,0.97) !important;
+    border: 1px solid var(--border-hover) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(74,230,138,0.05) !important;
+    backdrop-filter: blur(20px) !important;
+    padding: 0 !important;
+    max-width: 320px !important;
+  }
+  .leaflet-popup-content { margin: 0 !important; font-family: var(--font-body) !important; color: var(--text-primary) !important; width: 280px !important; }
+  .leaflet-popup-tip { background: rgba(13,18,16,0.97) !important; border: 1px solid var(--border) !important; }
+  .leaflet-popup-close-button {
+    color: var(--text-muted) !important;
+    font-size: 20px !important;
+    top: 6px !important;
+    right: 10px !important;
+    transition: color 0.2s !important;
+  }
+  .leaflet-popup-close-button:hover { color: var(--text-primary) !important; }
+
+  .popup-inner {
+    padding: 18px 20px;
+  }
+  .popup-inner .pi-name {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    color: #eaf5e8;
+    line-height: 1.3;
+    margin-bottom: 3px;
+    padding-right: 20px;
+  }
+  .popup-inner .pi-hotspot {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-bottom: 14px;
+  }
+  .popup-inner .pi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .popup-inner .pi-item label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 2px;
+  }
+  .popup-inner .pi-item .pi-val {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  .popup-inner .pi-item .pi-val.danger { color: var(--accent-red); }
+  .popup-inner .pi-item .pi-val.warning { color: var(--accent-orange); }
+
+  .popup-bar-section {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .popup-bar-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .popup-bar-track {
+    height: 6px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .popup-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .popup-tags {
+    display: flex;
+    gap: 5px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* ─── Layer control custom ─── */
+  .layer-control {
+    position: absolute;
+    bottom: 28px;
+    right: 16px;
+    z-index: 1000;
+    background: rgba(13,18,16,0.95);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    min-width: 180px;
+  }
+  .layer-control h4 {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+  .layer-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    padding: 3px 0;
+  }
+  .layer-row:last-child { margin-bottom: 0; }
+  .layer-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .layer-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    transition: color 0.2s;
+    user-select: none;
+  }
+  .layer-row:hover .layer-label { color: var(--text-primary); }
+  .layer-row.off .layer-dot { opacity: 0.2; }
+  .layer-row.off .layer-label { opacity: 0.35; text-decoration: line-through; }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 768px) {
+    #sidebar { width: 100%; height: 55vh; top: auto; bottom: 0; border-right: none; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0; }
+    #sidebar.collapsed { transform: translateY(55vh); }
+    #sidebar-toggle { top: auto; bottom: 16px; }
+    #sidebar-toggle.shifted { left: 16px; bottom: calc(55vh + 16px); }
+    .sidebar-header h1 { font-size: 22px; }
+    .layer-control { bottom: 68px; }
+  }
+
+  /* Animations */
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .forest-card { animation: fadeSlideIn 0.3s ease both; }
+
+  /* Custom marker animations */
+  .marker-critical {
+    animation: critical-pulse 2.5s ease-in-out infinite;
+  }
+  @keyframes critical-pulse {
+    0%, 100% { box-shadow: 0 0 6px 2px rgba(255,71,87,0.4); }
+    50% { box-shadow: 0 0 16px 6px rgba(255,71,87,0.6), 0 0 32px 10px rgba(255,71,87,0.15); }
+  }
+
+  .marker-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid rgba(255,71,87,0.5);
+    animation: ring-expand 2.5s ease-out infinite;
+    pointer-events: none;
+  }
+  @keyframes ring-expand {
+    0% { width: 16px; height: 16px; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.7; }
+    100% { width: 50px; height: 50px; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- Sidebar Toggle -->
+<button id="sidebar-toggle" class="shifted" onclick="toggleSidebar()">☰</button>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <div class="sidebar-header">
+    <div class="eyebrow">
+      <span class="eyebrow-dot"></span>
+      Biodiversity Conservation Atlas
+    </div>
+    <h1>The Rarest &<br>Least <em>Protected</em><br>Forests</h1>
+    <p class="subtitle">
+      69 rare forest ecoregions across 20 biodiversity hotspots — the first quartile by extent of forest cover in protected areas.
+    </p>
+
+    <div class="stats-row">
+      <div class="stat-cell">
+        <div class="stat-val">69</div>
+        <div class="stat-label">Rare<br>Ecoregions</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val">45</div>
+        <div class="stat-label">On<br>Islands</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val">47</div>
+        <div class="stat-label">Under<br>10%</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val critical-val">4</div>
+        <div class="stat-label">Most<br>Vulnerable</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filters" id="filters"></div>
+
+  <div class="search-wrap" style="position:relative;">
+    <span class="search-icon">⌕</span>
+    <input class="search-input" id="search" type="text" placeholder="Search ecoregions or hotspots…" oninput="renderList()">
+  </div>
+
+  <div class="forest-list" id="forest-list"></div>
+</div>
+
+<!-- Layer control -->
+<div class="layer-control" id="layer-control"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ─── DATA ───
+const FORESTS = [
+  { name:"Caatinga Enclaves Moist Forest", hotspot:"Atlantic Forest", area:4817, forest:823, protArea:244, protPct:30, lat:-7.5, lng:-39, island:false },
+  { name:"Fernando De Noronha-Atol Das Rocas Moist Forests", hotspot:"Atlantic Forest", area:19, forest:0.4, protArea:0.4, protPct:94, lat:-3.85, lng:-32.4, island:true },
+  { name:"Pernambuco Coastal Forests", hotspot:"Atlantic Forest", area:17809, forest:803, protArea:43, protPct:5, lat:-8, lng:-35, island:false },
+  { name:"Pernambuco Interior Forests", hotspot:"Atlantic Forest", area:23009, forest:719, protArea:188, protPct:26, lat:-8.8, lng:-36.5, island:false },
+  { name:"East Cascades–Modoc Plateau Forests", hotspot:"California Floristic Province", area:2230, forest:1829, protArea:19, protPct:1, lat:42, lng:-121, island:false },
+  { name:"Bahamian Pine Mosaic", hotspot:"Caribbean Islands", area:7565, forest:1337, protArea:116, protPct:9, lat:24, lng:-77.5, island:true },
+  { name:"Jamaican Dry Forests", hotspot:"Caribbean Islands", area:2440, forest:903, protArea:112, protPct:12, lat:18, lng:-77, island:true },
+  { name:"Lesser Antillean Dry Forests", hotspot:"Caribbean Islands", area:661, forest:294, protArea:54, protPct:18, lat:15, lng:-61, island:true },
+  { name:"Puerto Rican Dry Forests", hotspot:"Caribbean Islands", area:1343, forest:566, protArea:90, protPct:16, lat:18, lng:-66, island:true },
+  { name:"Northern Anatolian Conifer & Deciduous Forests", hotspot:"Caucasus", area:14161, forest:2965, protArea:110, protPct:4, lat:41, lng:34, island:false },
+  { name:"Juan Fernández Islands Temperate Forests", hotspot:"Chilean Winter Rainfall & Valdivian Forests", area:176, forest:2.4, protArea:0, protPct:0, lat:-33.6, lng:-78.8, island:true, noProtected:true, hasNational:true },
+  { name:"San Félix-San Ambrosio Islands Temperate Forests", hotspot:"Chilean Winter Rainfall & Valdivian Forests", area:15, forest:0, protArea:0, protPct:0, lat:-26.3, lng:-80, island:true, noProtected:true, critical:true },
+  { name:"Admiralty Islands Lowland Rain Forests", hotspot:"East Melanesian Islands", area:2114, forest:1112, protArea:3.2, protPct:0.3, lat:-2, lng:147, island:true },
+  { name:"New Britain-New Ireland Montane Rain Forests", hotspot:"East Melanesian Islands", area:12197, forest:6937, protArea:30, protPct:0.4, lat:-5.5, lng:151, island:true },
+  { name:"Solomon Islands Rain Forests", hotspot:"East Melanesian Islands", area:36279, forest:14307, protArea:85, protPct:1, lat:-8, lng:157, island:true },
+  { name:"Cross-Niger Transition Forests", hotspot:"Guinean Forests of West Africa", area:20844, forest:13824, protArea:192, protPct:1, lat:6, lng:7, island:false },
+  { name:"São Tomé & Príncipe Moist Lowland Forests", hotspot:"Guinean Forests of West Africa", area:993, forest:751, protArea:263, protPct:35, lat:0.3, lng:6.6, island:true },
+  { name:"Andaman Islands Rain Forests", hotspot:"Indo-Burma", area:5861, forest:2792, protArea:66, protPct:2, lat:12, lng:93, island:true },
+  { name:"Irrawaddy Dry Forests", hotspot:"Indo-Burma", area:37577, forest:1577, protArea:130, protPct:8, lat:20, lng:95, island:false },
+  { name:"Meghalaya Subtropical Forests", hotspot:"Indo-Burma", area:46365, forest:10452, protArea:130, protPct:1, lat:25.5, lng:91.5, island:false },
+  { name:"NE India-Myanmar Pine Forests", hotspot:"Indo-Burma", area:10763, forest:5316, protArea:2.7, protPct:0.05, lat:24, lng:96, island:false },
+  { name:"N. Khorat Plateau Moist Deciduous Forests", hotspot:"Indo-Burma", area:17736, forest:1853, protArea:81, protPct:4, lat:16, lng:103, island:false },
+  { name:"Eastern Anatolian Deciduous Forests", hotspot:"Irano-Anatolian", area:85835, forest:278, protArea:6, protPct:2, lat:39, lng:41, island:false },
+  { name:"Kopet Dag Woodlands & Forest Steppe", hotspot:"Irano-Anatolian", area:123518, forest:0, protArea:0, protPct:0, lat:38, lng:57, island:false, noProtected:true, hasNational:true },
+  { name:"Zagros Mountains Forest Steppe", hotspot:"Irano-Anatolian", area:476260, forest:21, protArea:0.5, protPct:3, lat:34, lng:47, island:false },
+  { name:"Ogasawara Subtropical Moist Forests", hotspot:"Japan", area:108, forest:15, protArea:12, protPct:79, lat:27, lng:142, island:true },
+  { name:"Comoros Forests", hotspot:"Madagascar & Indian Ocean Islands", area:2114, forest:1097, protArea:124, protPct:11, lat:-12.2, lng:44.2, island:true },
+  { name:"Granitic Seychelles Forests", hotspot:"Madagascar & Indian Ocean Islands", area:313, forest:16, protArea:2.4, protPct:15, lat:-4.6, lng:55.5, island:true },
+  { name:"Azores Temperate Mixed Forests", hotspot:"Mediterranean Basin", area:3338, forest:721, protArea:96, protPct:13, lat:38.7, lng:-27.2, island:true },
+  { name:"Cape Verde Islands Dry Forests", hotspot:"Mediterranean Basin", area:4752, forest:70, protArea:5, protPct:7, lat:16, lng:-24, island:true },
+  { name:"Crete Mediterranean Forests", hotspot:"Mediterranean Basin", area:10042, forest:311, protArea:86, protPct:28, lat:35.2, lng:24.9, island:true },
+  { name:"E. Med. Conifer-Sclerophyllous-Broadleaf Forests", hotspot:"Mediterranean Basin", area:177692, forest:3211, protArea:66, protPct:2, lat:36, lng:36, island:false },
+  { name:"Cayos Miskitos-San Andrés & Providencia Moist Forests", hotspot:"Mesoamerica", area:98, forest:27, protArea:20, protPct:75, lat:14.5, lng:-82.5, island:true },
+  { name:"Chiapas Depression Dry Forests", hotspot:"Mesoamerica", area:14628, forest:2426, protArea:155, protPct:6, lat:16, lng:-93, island:false },
+  { name:"Chiapas Montane Forests", hotspot:"Mesoamerica", area:6048, forest:4875, protArea:237, protPct:5, lat:16.5, lng:-92.5, island:false },
+  { name:"Chimalapas Montane Forests", hotspot:"Mesoamerica", area:2179, forest:1665, protArea:88, protPct:5, lat:16.8, lng:-94.5, island:false },
+  { name:"Cocos Island Moist Forests", hotspot:"Mesoamerica", area:25, forest:0, protArea:0, protPct:0, lat:5.5, lng:-87, island:true, noProtected:true, hasNational:true },
+  { name:"Islas Revillagigedo Dry Forests", hotspot:"Mesoamerica", area:227, forest:66, protArea:66, protPct:100, lat:19, lng:-111, island:true },
+  { name:"Oaxacan Montane Forests", hotspot:"Mesoamerica", area:8020, forest:6747, protArea:170, protPct:3, lat:17, lng:-96, island:false },
+  { name:"Panamanian Dry Forests", hotspot:"Mesoamerica", area:5168, forest:592, protArea:92, protPct:15, lat:8, lng:-80, island:false },
+  { name:"Veracruz Dry Forests", hotspot:"Mesoamerica", area:7031, forest:372, protArea:6, protPct:2, lat:19, lng:-96.5, island:false },
+  { name:"Veracruz Montane Forests", hotspot:"Mesoamerica", area:5302, forest:4069, protArea:179, protPct:4, lat:19.5, lng:-97, island:false },
+  { name:"Chatham Island Temperate Forests", hotspot:"New Zealand", area:240, forest:12, protArea:0, protPct:0, lat:-44, lng:-176.5, island:true, noProtected:true, hasNational:true },
+  { name:"Kermadec Islands Subtropical Moist Forests", hotspot:"New Zealand", area:38, forest:13, protArea:0.1, protPct:1, lat:-29.3, lng:-177.9, island:true },
+  { name:"Lord Howe Island Subtropical Forests", hotspot:"New Zealand", area:16, forest:1.5, protArea:1.1, protPct:71, lat:-31.5, lng:159, island:true },
+  { name:"Norfolk Island Subtropical Forests", hotspot:"New Zealand", area:48, forest:2, protArea:1.7, protPct:86, lat:-29, lng:168, island:true },
+  { name:"Sulu Archipelago Rain Forests", hotspot:"Philippines", area:2352, forest:765, protArea:1.4, protPct:0.2, lat:6, lng:121, island:true },
+  { name:"Carolines Tropical Moist Forests", hotspot:"Polynesia-Micronesia", area:585, forest:2.4, protArea:0.1, protPct:4, lat:7, lng:152, island:true },
+  { name:"Central Polynesian Tropical Moist Forests", hotspot:"Polynesia-Micronesia", area:501, forest:null, protArea:0, protPct:0, lat:-14, lng:-171, island:true, noProtected:true, hasNational:true },
+  { name:"Cook Islands Tropical Moist Forests", hotspot:"Polynesia-Micronesia", area:182, forest:null, protArea:0, protPct:0, lat:-21.2, lng:-159.8, island:true, noProtected:true, hasNational:true },
+  { name:"Eastern Micronesia Tropical Moist Forests", hotspot:"Polynesia-Micronesia", area:536, forest:0, protArea:0, protPct:0, lat:6, lng:162, island:true, noProtected:true },
+  { name:"Fiji Tropical Dry Forests", hotspot:"Polynesia-Micronesia", area:12188, forest:948, protArea:7, protPct:1, lat:-18, lng:178, island:true },
+  { name:"Fiji Tropical Moist Forests", hotspot:"Polynesia-Micronesia", area:7249, forest:3740, protArea:92, protPct:2, lat:-17.5, lng:178, island:true },
+  { name:"Marianas Tropical Dry Forests", hotspot:"Polynesia-Micronesia", area:1071, forest:26, protArea:6, protPct:23, lat:15, lng:145.7, island:true },
+  { name:"Marquesas Tropical Moist Forests", hotspot:"Polynesia-Micronesia", area:888, forest:null, protArea:0, protPct:0, lat:-9, lng:-140, island:true, noProtected:true, hasNational:true },
+  { name:"Palau Tropical Moist Forests", hotspot:"Polynesia-Micronesia", area:467, forest:208, protArea:16, protPct:7, lat:7.5, lng:134.5, island:true, noProtected:true, hasNational:true },
+  { name:"Samoan Tropical Moist Forests", hotspot:"Polynesia-Micronesia", area:3189, forest:262, protArea:122, protPct:46, lat:-14, lng:-172, island:true },
+  { name:"Society Islands Tropical Moist Forests", hotspot:"Polynesia-Micronesia", area:1707, forest:null, protArea:0, protPct:0, lat:-17.5, lng:-149.5, island:true, noProtected:true, hasNational:true },
+  { name:"Tongan Tropical Moist Forests", hotspot:"Polynesia-Micronesia", area:1001, forest:45, protArea:9, protPct:21, lat:-21, lng:-175, island:true },
+  { name:"Tuamotu Tropical Moist Forests", hotspot:"Polynesia-Micronesia", area:799, forest:null, protArea:0, protPct:0, lat:-16, lng:-145, island:true },
+  { name:"Tubuai Tropical Moist Forests", hotspot:"Polynesia-Micronesia", area:124, forest:13, protArea:0, protPct:0, lat:-23.4, lng:-149.5, island:true, noProtected:true, critical:true },
+  { name:"Western Polynesian Tropical Moist Forests", hotspot:"Polynesia-Micronesia", area:94, forest:0.6, protArea:0, protPct:0, lat:-13.3, lng:-176.2, island:true, noProtected:true, hasNational:true },
+  { name:"Yap Tropical Dry Forests", hotspot:"Polynesia-Micronesia", area:103, forest:41, protArea:0, protPct:0, lat:9.5, lng:138.1, island:true, noProtected:true, critical:true },
+  { name:"Christmas & Cocos Islands Tropical Forests", hotspot:"Sundaland", area:138, forest:2.8, protArea:1.7, protPct:62, lat:-10.5, lng:105.7, island:true },
+  { name:"Cauca Valley Dry Forests", hotspot:"Tropical Andes", area:7381, forest:3603, protArea:0, protPct:0, lat:3.5, lng:-76.5, island:false, noProtected:true, hasNational:true },
+  { name:"Magdalena Valley Dry Forests", hotspot:"Tropical Andes", area:19709, forest:10325, protArea:6.2, protPct:0.06, lat:7, lng:-73.5, island:false },
+  { name:"Patía Valley Dry Forests", hotspot:"Tropical Andes", area:2276, forest:948, protArea:0, protPct:0, lat:1.8, lng:-77.2, island:false, noProtected:true, hasNational:true },
+  { name:"Sumba Deciduous Forests", hotspot:"Wallacea", area:10941, forest:1133, protArea:154, protPct:14, lat:-9.8, lng:120, island:true },
+  { name:"Maldives-Lakshadweep-Chagos Tropical Moist Forests", hotspot:"Western Ghats & Sri Lanka", area:262, forest:25, protArea:0, protPct:0, lat:4, lng:73, island:true, noProtected:true, critical:true },
+];
+
+// ─── MAP SETUP ───
+const map = L.map('map', {
+  center: [10, 20],
+  zoom: 3,
+  zoomControl: false,
+  minZoom: 2,
+  maxZoom: 15,
+  maxBounds: [[-85, -250], [85, 250]],
+  maxBoundsViscosity: 1.0,
+});
+
+L.control.zoom({ position: 'topright' }).addTo(map);
+
+// Dark tile layer
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  subdomains: 'abcd',
+}).addTo(map);
+
+// Labels layer on top
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+  subdomains: 'abcd',
+  pane: 'overlayPane',
+}).addTo(map);
+
+// ─── MARKER CREATION ───
+const layers = {
+  critical: L.layerGroup(),
+  noProtected: L.layerGroup(),
+  under10: L.layerGroup(),
+  over10: L.layerGroup(),
+};
+
+const markers = {};
+
+function getCategory(f) {
+  if (f.critical) return 'critical';
+  if (f.noProtected) return 'noProtected';
+  if (f.protPct < 10) return 'under10';
+  return 'over10';
+}
+
+const COLORS = {
+  critical: '#ff4757',
+  noProtected: '#ff8844',
+  under10: '#f0c040',
+  over10: '#4ae68a',
+};
+
+const CAT_LABELS = {
+  critical: 'Most vulnerable',
+  noProtected: 'No IUCN protection',
+  under10: '< 10% protected',
+  over10: '≥ 10% protected',
+};
+
+function createIcon(f) {
+  const cat = getCategory(f);
+  const color = COLORS[cat];
+  const size = f.critical ? 18 : f.noProtected ? 14 : 12;
+  const border = f.critical ? `3px solid ${color}` : `2px solid ${color}`;
+
+  let html = `<div style="
+    width:${size}px; height:${size}px;
+    border-radius:50%;
+    background: radial-gradient(circle at 35% 35%, ${color}, ${color}88);
+    border: ${border};
+    box-shadow: 0 0 8px ${color}55, 0 0 20px ${color}22;
+    ${f.critical ? '' : ''}
+  " class="${f.critical ? 'marker-critical' : ''}"></div>`;
+
+  if (f.critical) {
+    html += `<div class="marker-ring"></div>`;
+  }
+
+  return L.divIcon({
+    html: html,
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+    popupAnchor: [0, -size/2 - 4],
+  });
+}
+
+function createPopup(f) {
+  const cat = getCategory(f);
+  const color = COLORS[cat];
+  const forestStr = f.forest !== null ? f.forest.toLocaleString() + ' km²' : 'No data';
+  const protStr = f.protArea === 0 ? 'None' : f.protArea.toLocaleString() + ' km²';
+  const protClass = f.protArea === 0 ? 'danger' : f.protPct < 10 ? 'warning' : '';
+  const pctClass = f.protPct === 0 ? 'danger' : f.protPct < 10 ? 'warning' : '';
+  const barWidth = Math.max(f.protPct === 0 ? 0 : Math.max(2, f.protPct), 0);
+
+  let tags = '';
+  if (f.critical) tags += '<span class="fc-tag critical">MOST VULNERABLE</span>';
+  if (f.noProtected) tags += '<span class="fc-tag no-prot">No IUCN protection</span>';
+  if (f.island) tags += '<span class="fc-tag island">Island</span>';
+  if (f.hasNational) tags += '<span class="fc-tag has-nat">Has national reserve</span>';
+
+  return `
+    <div class="popup-inner">
+      <div class="pi-name">${f.name}</div>
+      <div class="pi-hotspot">${f.hotspot}</div>
+      <div class="pi-grid">
+        <div class="pi-item">
+          <label>Ecoregion area</label>
+          <div class="pi-val">${f.area.toLocaleString()} km²</div>
+        </div>
+        <div class="pi-item">
+          <label>Forest cover</label>
+          <div class="pi-val">${forestStr}</div>
+        </div>
+        <div class="pi-item">
+          <label>Protected forest</label>
+          <div class="pi-val ${protClass}">${protStr}</div>
+        </div>
+        <div class="pi-item">
+          <label>% Protected</label>
+          <div class="pi-val ${pctClass}">${f.protPct}%</div>
+        </div>
+      </div>
+      <div class="popup-bar-section">
+        <div class="popup-bar-label">
+          <span>Forest in protected areas</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:${color}">${f.protPct}%</span>
+        </div>
+        <div class="popup-bar-track">
+          <div class="popup-bar-fill" style="width:${barWidth}%;background:${color};"></div>
+        </div>
+      </div>
+      ${tags ? '<div class="popup-tags">' + tags + '</div>' : ''}
+    </div>
+  `;
+}
+
+FORESTS.forEach((f, i) => {
+  const cat = getCategory(f);
+  const marker = L.marker([f.lat, f.lng], { icon: createIcon(f) })
+    .bindPopup(createPopup(f), { maxWidth: 300, closeButton: true });
+
+  marker.on('mouseover', function() { this.openPopup(); });
+
+  markers[i] = { marker, data: f, cat };
+  layers[cat].addLayer(marker);
+});
+
+Object.values(layers).forEach(lg => lg.addTo(map));
+
+// ─── LAYER CONTROL ───
+const layerControlEl = document.getElementById('layer-control');
+const layerState = { critical: true, noProtected: true, under10: true, over10: true };
+
+function renderLayerControl() {
+  let html = '<h4>Map Layers</h4>';
+  Object.keys(layers).forEach(key => {
+    const on = layerState[key];
+    html += `<div class="layer-row ${on ? '' : 'off'}" onclick="toggleLayer('${key}')">
+      <div class="layer-dot" style="background:${COLORS[key]};box-shadow:0 0 6px ${COLORS[key]}55;"></div>
+      <span class="layer-label">${CAT_LABELS[key]}</span>
+    </div>`;
+  });
+  layerControlEl.innerHTML = html;
+}
+
+function toggleLayer(key) {
+  layerState[key] = !layerState[key];
+  if (layerState[key]) {
+    map.addLayer(layers[key]);
+  } else {
+    map.removeLayer(layers[key]);
+  }
+  renderLayerControl();
+}
+
+renderLayerControl();
+
+// ─── SIDEBAR ───
+let sidebarOpen = true;
+let activeFilter = 'all';
+let activeCard = null;
+
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('collapsed', !sidebarOpen);
+  document.getElementById('sidebar-toggle').classList.toggle('shifted', sidebarOpen);
+  document.getElementById('sidebar-toggle').textContent = sidebarOpen ? '✕' : '☰';
+  setTimeout(() => map.invalidateSize(), 450);
+}
+
+// Filters
+const FILTERS = [
+  { key: 'all', label: 'All', count: FORESTS.length },
+  { key: 'critical', label: 'Most Vulnerable', count: FORESTS.filter(f => f.critical).length },
+  { key: 'noProtected', label: 'No Protection', count: FORESTS.filter(f => f.noProtected).length },
+  { key: 'island', label: 'Islands', count: FORESTS.filter(f => f.island).length },
+  { key: 'continental', label: 'Continental', count: FORESTS.filter(f => !f.island).length },
+];
+
+function renderFilters() {
+  const el = document.getElementById('filters');
+  el.innerHTML = FILTERS.map(f =>
+    `<button class="filter-btn ${activeFilter === f.key ? 'active' : ''}" onclick="setFilter('${f.key}')">
+      ${f.label}<span class="count">${f.count}</span>
+    </button>`
+  ).join('');
+}
+
+function setFilter(key) {
+  activeFilter = key;
+  renderFilters();
+  renderList();
+}
+
+function getFiltered() {
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  return FORESTS.filter((f, i) => {
+    if (activeFilter === 'critical' && !f.critical) return false;
+    if (activeFilter === 'noProtected' && !f.noProtected) return false;
+    if (activeFilter === 'island' && !f.island) return false;
+    if (activeFilter === 'continental' && f.island) return false;
+    if (q && !f.name.toLowerCase().includes(q) && !f.hotspot.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+function renderList() {
+  const listEl = document.getElementById('forest-list');
+  const filtered = getFiltered();
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">No ecoregions match your filter.</div>';
+    return;
+  }
+
+  listEl.innerHTML = filtered.map((f, idx) => {
+    const cat = getCategory(f);
+    const color = COLORS[cat];
+    const globalIdx = FORESTS.indexOf(f);
+    const forestStr = f.forest !== null ? f.forest.toLocaleString() : '—';
+    const protStr = f.protArea === 0 ? 'None' : f.protArea.toLocaleString();
+    const protClass = f.protArea === 0 ? 'danger' : f.protPct < 10 ? 'warning' : '';
+    const vulnHeight = f.critical ? 100 : f.noProtected ? 70 : f.protPct < 10 ? 40 : 15;
+
+    let tags = '';
+    if (f.critical) tags += '<span class="fc-tag critical">MOST VULNERABLE</span>';
+    if (f.noProtected && !f.critical) tags += '<span class="fc-tag no-prot">No protection</span>';
+    if (f.island) tags += '<span class="fc-tag island">Island</span>';
+
+    return `<div class="forest-card ${activeCard === globalIdx ? 'active' : ''}"
+      onclick="flyTo(${globalIdx})" style="animation-delay:${idx * 0.03}s">
+      <div class="fc-bar-wrap"><div class="fc-bar" style="height:${vulnHeight}%;background:${color};"></div></div>
+      <div class="fc-name">${f.name}</div>
+      <div class="fc-hotspot">${f.hotspot}</div>
+      <div class="fc-meta">
+        <span>Area <span class="val">${f.area.toLocaleString()}</span> km²</span>
+        <span>Forest <span class="val">${forestStr}</span> km²</span>
+        <span>Prot. <span class="val ${protClass}">${f.protPct}%</span></span>
+      </div>
+      ${tags ? '<div class="fc-tags">' + tags + '</div>' : ''}
+    </div>`;
+  }).join('');
+}
+
+function flyTo(idx) {
+  const f = FORESTS[idx];
+  const m = markers[idx];
+  activeCard = idx;
+
+  const zoom = f.area < 500 ? 10 : f.area < 5000 ? 8 : f.area < 50000 ? 6 : 5;
+  map.flyTo([f.lat, f.lng], zoom, { duration: 1.2, easeLinearity: 0.25 });
+
+  setTimeout(() => {
+    m.marker.openPopup();
+  }, 600);
+
+  renderList();
+}
+
+// Initial render
+renderFilters();
+renderList();
+</script>
+</body>
+</html>
