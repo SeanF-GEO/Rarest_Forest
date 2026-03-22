@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow" />
 <title>The Rarest & Least Protected Forests in Biodiversity Hotspots</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Source+Sans+3:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -31,10 +31,18 @@
   body { background:var(--bg-deep); color:var(--text-primary); font-family:var(--font-body); overflow:hidden; height:100vh; }
   #map { position:absolute; inset:0; z-index:1; }
 
-  .leaflet-control-zoom a { background:var(--bg-panel)!important; color:var(--text-secondary)!important; border-color:var(--border)!important; width:36px!important; height:36px!important; line-height:36px!important; font-size:18px!important; transition:all .2s; }
-  .leaflet-control-zoom a:hover { background:var(--bg-card)!important; color:var(--text-primary)!important; }
-  .leaflet-control-attribution { background:rgba(8,11,10,0.85)!important; color:var(--text-muted)!important; font-size:11px!important; font-family:var(--font-body)!important; }
-  .leaflet-control-attribution a { color:var(--text-secondary)!important; }
+  /* MapLibre overrides */
+  .maplibregl-ctrl-group { background:var(--bg-panel)!important; border:1px solid var(--border)!important; border-radius:8px!important; overflow:hidden; }
+  .maplibregl-ctrl-group button { width:36px!important; height:36px!important; background:var(--bg-panel)!important; color:var(--text-secondary)!important; border:none!important; border-bottom:1px solid var(--border)!important; }
+  .maplibregl-ctrl-group button:last-child { border-bottom:none!important; }
+  .maplibregl-ctrl-group button:hover { background:var(--bg-card)!important; }
+  .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter:invert(0.7) sepia(0.2) hue-rotate(90deg); }
+  .maplibregl-ctrl-attrib { background:rgba(8,11,10,0.85)!important; color:var(--text-muted)!important; font-size:11px!important; font-family:var(--font-body)!important; }
+  .maplibregl-ctrl-attrib a { color:var(--text-secondary)!important; }
+  .maplibregl-popup-content { background:rgba(13,18,16,0.97)!important; border:1px solid var(--border-hover)!important; border-radius:12px!important; box-shadow:0 12px 48px rgba(0,0,0,0.6),0 0 0 1px rgba(61,255,138,0.06)!important; padding:0!important; max-width:340px!important; color:var(--text-primary)!important; font-family:var(--font-body)!important; }
+  .maplibregl-popup-tip { border-top-color:rgba(13,18,16,0.97)!important; }
+  .maplibregl-popup-close-button { color:var(--text-muted)!important; font-size:22px!important; top:6px!important; right:10px!important; padding:0 6px!important; }
+  .maplibregl-popup-close-button:hover { color:var(--text-primary)!important; background:transparent!important; }
 
   /* Loading */
   #loading { position:fixed; inset:0; z-index:9999; background:var(--bg-deep); display:flex; flex-direction:column; align-items:center; justify-content:center; transition:opacity .6s; }
@@ -109,12 +117,7 @@
   .fc-bar-wrap { position:absolute; top:14px; right:16px; width:3px; height:32px; border-radius:2px; background:rgba(255,255,255,0.05); overflow:hidden; }
   .fc-bar { position:absolute; bottom:0; width:100%; border-radius:2px; }
 
-  /* Popup */
-  .leaflet-popup-content-wrapper { background:rgba(13,18,16,0.97)!important; border:1px solid var(--border-hover)!important; border-radius:12px!important; box-shadow:0 12px 48px rgba(0,0,0,0.6),0 0 0 1px rgba(61,255,138,0.06)!important; backdrop-filter:blur(20px)!important; padding:0!important; max-width:340px!important; }
-  .leaflet-popup-content { margin:0!important; font-family:var(--font-body)!important; color:var(--text-primary)!important; width:300px!important; }
-  .leaflet-popup-tip { background:rgba(13,18,16,0.97)!important; border:1px solid var(--border)!important; }
-  .leaflet-popup-close-button { color:var(--text-muted)!important; font-size:22px!important; top:6px!important; right:10px!important; }
-  .leaflet-popup-close-button:hover { color:var(--text-primary)!important; }
+  /* Popup inner */
   .popup-inner { padding:20px 22px; }
   .pi-name { font-family:var(--font-display); font-size:16px; font-weight:700; color:#f0faf0; line-height:1.3; margin-bottom:4px; padding-right:22px; }
   .pi-hotspot { font-size:12px; color:var(--text-muted); font-style:italic; margin-bottom:16px; }
@@ -125,7 +128,7 @@
   .popup-bar-section { margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }
   .popup-bar-label { font-size:11px; color:var(--text-muted); margin-bottom:7px; display:flex; justify-content:space-between; }
   .popup-bar-track { height:7px; background:rgba(255,255,255,0.05); border-radius:4px; overflow:hidden; }
-  .popup-bar-fill { height:100%; border-radius:4px; transition:width .6s cubic-bezier(.4,0,.2,1); }
+  .popup-bar-fill { height:100%; border-radius:4px; }
   .popup-tags { display:flex; gap:5px; margin-top:14px; flex-wrap:wrap; }
 
   /* Layer control */
@@ -160,7 +163,6 @@
     <p class="subtitle">69 rare forest ecoregions across 20 biodiversity hotspots, identified by the smallest extent of forest cover within protected areas.</p>
   </div>
 
-  <!-- About / Description -->
   <div class="about-section">
     <button class="about-toggle" onclick="toggleAbout()"><span class="arrow" id="about-arrow">▶</span> About this map</button>
     <div class="about-body" id="about-body">
@@ -182,7 +184,7 @@
 </div>
 <div class="layer-control" id="layer-control"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 function toggleAbout(){
   const b=document.getElementById('about-body'),a=document.getElementById('about-arrow');
@@ -269,14 +271,73 @@ const CAT_LABELS={critical:'Most vulnerable',noProtected:'No IUCN protection',un
 function getCategory(f){if(f.critical)return'critical';if(f.noProtected)return'noProtected';if(f.protPct<10)return'under10';return'over10'}
 function getColor(f){return COLORS[getCategory(f)]}
 
-const map=L.map('map',{center:[10,20],zoom:3,zoomControl:false,minZoom:2,maxZoom:15,maxBounds:[[-85,-250],[85,250]],maxBoundsViscosity:1});
-L.control.zoom({position:'topright'}).addTo(map);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',subdomains:'abcd'}).addTo(map);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',pane:'overlayPane'}).addTo(map);
+/* ---- MapLibre Globe ---- */
+const map = new maplibregl.Map({
+  container:'map',
+  style:{
+    version:8,
+    glyphs:'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+    sources:{
+      'carto-dark':{
+        type:'raster',
+        tiles:[
+          'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+          'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+          'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'
+        ],
+        tileSize:256,
+        attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
+      }
+    },
+    layers:[{id:'carto-base',type:'raster',source:'carto-dark'}]
+  },
+  center:[20,10],
+  zoom:2,
+  minZoom:1.5,
+  maxZoom:15,
+  projection:{type:'globe'},
+  attributionControl:true
+});
+map.addControl(new maplibregl.NavigationControl({showCompass:true}),'top-right');
 
-const layers={critical:L.layerGroup(),noProtected:L.layerGroup(),under10:L.layerGroup(),over10:L.layerGroup()};
+/* Atmosphere / sky for the globe */
+map.on('style.load',()=>{
+  map.setFog({
+    color:'rgba(10,15,12,1)',
+    'high-color':'rgba(20,50,35,1)',
+    'horizon-blend':0.03,
+    'space-color':'#060908',
+    'star-intensity':0.55
+  });
+});
+
+/* ---- Bounding box helper ---- */
+function geojsonBounds(geojson){
+  let minLng=Infinity,minLat=Infinity,maxLng=-Infinity,maxLat=-Infinity;
+  function processCoord(c){if(c[0]<minLng)minLng=c[0];if(c[0]>maxLng)maxLng=c[0];if(c[1]<minLat)minLat=c[1];if(c[1]>maxLat)maxLat=c[1]}
+  function walk(coords,depth){
+    if(depth===0){processCoord(coords);return}
+    coords.forEach(c=>walk(c,depth-1));
+  }
+  const feats=geojson.features||[geojson];
+  feats.forEach(f=>{
+    const g=f.geometry||f;
+    if(!g||!g.coordinates)return;
+    const t=g.type;
+    if(t==='Point')processCoord(g.coordinates);
+    else if(t==='MultiPoint'||t==='LineString')walk(g.coordinates,1);
+    else if(t==='MultiLineString'||t==='Polygon')walk(g.coordinates,2);
+    else if(t==='MultiPolygon')walk(g.coordinates,3);
+  });
+  return[[minLng,minLat],[maxLng,maxLat]];
+}
+
+/* ---- State ---- */
 const layerState={critical:true,noProtected:true,under10:true,over10:true};
-const geoLayers={};
+const featureBounds={};  // idx -> [[sw],[ne]]
+const featureCentroids={}; // idx -> [lng,lat]
+let currentPopup=null;
+let hoveredIdx=null;
 
 function popupHTML(f){
   const cat=getCategory(f),color=COLORS[cat];
@@ -306,30 +367,108 @@ function popupHTML(f){
   </div>`;
 }
 
+/* ---- Load GeoJSON and build layers ---- */
 const statusEl=document.getElementById('load-status');
+
 fetch('Ecoregions2017.json').then(r=>{statusEl.textContent='Processing polygons…';return r.json()}).then(geojson=>{
   statusEl.textContent='Matching rare forest ecoregions…';
-  let matched=0;
+
+  // Filter and annotate features
+  const matchedFeatures=[];
   geojson.features.forEach(feature=>{
     const eName=(feature.properties.ECO_NAME||'').toLowerCase();
     const idx=ECO_LOOKUP[eName];
     if(idx===undefined)return;
-    matched++;
-    const f=FORESTS[idx],cat=getCategory(f),color=getColor(f);
-    const layer=L.geoJSON(feature,{
-      style:{fillColor:color,fillOpacity:f.critical?.5:.35,color:color,weight:f.critical?2.5:1.5,opacity:f.critical?1:.8},
-      onEachFeature:function(_,lyr){
-        lyr.bindPopup(popupHTML(f),{maxWidth:340,closeButton:true});
-        lyr.on('mouseover',function(){this.setStyle({fillOpacity:f.critical?.7:.55,weight:f.critical?3.5:2.5,opacity:1})});
-        lyr.on('mouseout',function(){this.setStyle({fillOpacity:f.critical?.5:.35,weight:f.critical?2.5:1.5,opacity:f.critical?1:.8})});
+    const f=FORESTS[idx];
+    const cat=getCategory(f);
+    // Add custom props
+    feature.properties._forestIdx=idx;
+    feature.properties._category=cat;
+    feature.properties._critical=f.critical?1:0;
+    matchedFeatures.push(feature);
+
+    // Compute bounds
+    const bb=geojsonBounds(feature);
+    featureBounds[idx]=bb;
+    featureCentroids[idx]=[(bb[0][0]+bb[1][0])/2,(bb[0][1]+bb[1][1])/2];
+  });
+
+  statusEl.textContent=`${matchedFeatures.length} ecoregions loaded`;
+
+  const filteredGeoJSON={type:'FeatureCollection',features:matchedFeatures};
+
+  map.on('load',()=>{
+    map.addSource('ecoregions',{type:'geojson',data:filteredGeoJSON,generateId:true});
+
+    // One fill + outline layer per category
+    const cats=['over10','under10','noProtected','critical'];
+    cats.forEach(cat=>{
+      const isCrit=cat==='critical';
+      map.addLayer({
+        id:'eco-fill-'+cat,
+        type:'fill',
+        source:'ecoregions',
+        filter:['==',['get','_category'],cat],
+        paint:{
+          'fill-color':COLORS[cat],
+          'fill-opacity':['case',['boolean',['feature-state','hover'],false],isCrit?0.7:0.55,isCrit?0.5:0.35]
+        }
+      });
+      map.addLayer({
+        id:'eco-line-'+cat,
+        type:'line',
+        source:'ecoregions',
+        filter:['==',['get','_category'],cat],
+        paint:{
+          'line-color':COLORS[cat],
+          'line-width':['case',['boolean',['feature-state','hover'],false],isCrit?3.5:2.5,isCrit?2.5:1.5],
+          'line-opacity':['case',['boolean',['feature-state','hover'],false],1,isCrit?1:0.8]
+        }
+      });
+    });
+
+    // Hover
+    let hoveredId=null;
+    const allFillLayers=cats.map(c=>'eco-fill-'+c);
+    const allLineLayers=cats.map(c=>'eco-line-'+c);
+    const allLayers=[...allFillLayers,...allLineLayers];
+
+    map.on('mousemove',allFillLayers,(e)=>{
+      if(e.features.length>0){
+        map.getCanvas().style.cursor='pointer';
+        if(hoveredId!==null){
+          map.setFeatureState({source:'ecoregions',id:hoveredId},{hover:false});
+        }
+        hoveredId=e.features[0].id;
+        map.setFeatureState({source:'ecoregions',id:hoveredId},{hover:true});
       }
     });
-    geoLayers[idx]=layer;
-    layers[cat].addLayer(layer);
+    map.on('mouseleave',allFillLayers,()=>{
+      map.getCanvas().style.cursor='';
+      if(hoveredId!==null){
+        map.setFeatureState({source:'ecoregions',id:hoveredId},{hover:false});
+        hoveredId=null;
+      }
+    });
+
+    // Click popup
+    map.on('click',allFillLayers,(e)=>{
+      if(!e.features.length)return;
+      const props=e.features[0].properties;
+      const idx=props._forestIdx;
+      const f=FORESTS[idx];
+      if(currentPopup)currentPopup.remove();
+      currentPopup=new maplibregl.Popup({maxWidth:'340px',closeButton:true})
+        .setLngLat(e.lngLat)
+        .setHTML(popupHTML(f))
+        .addTo(map);
+      activeCard=idx;
+      renderList();
+    });
+
+    setTimeout(()=>document.getElementById('loading').classList.add('hidden'),600);
   });
-  Object.values(layers).forEach(lg=>lg.addTo(map));
-  statusEl.textContent=`${matched} ecoregions loaded`;
-  setTimeout(()=>document.getElementById('loading').classList.add('hidden'),600);
+
   renderFilters();renderList();renderLayerControl();
 }).catch(err=>{
   statusEl.textContent='Error: '+err.message;
@@ -338,14 +477,16 @@ fetch('Ecoregions2017.json').then(r=>{statusEl.textContent='Processing polygons�
   renderFilters();renderList();renderLayerControl();
 });
 
+/* ---- Sidebar ---- */
 let sidebarOpen=true,activeFilter='all',activeCard=null;
 function toggleSidebar(){
   sidebarOpen=!sidebarOpen;
   document.getElementById('sidebar').classList.toggle('collapsed',!sidebarOpen);
   document.getElementById('sidebar-toggle').classList.toggle('shifted',sidebarOpen);
   document.getElementById('sidebar-toggle').textContent=sidebarOpen?'✕':'☰';
-  setTimeout(()=>map.invalidateSize(),450);
+  setTimeout(()=>map.resize(),450);
 }
+
 const FILTERS=[
   {key:'all',label:'All',count:FORESTS.length},
   {key:'critical',label:'Most Vulnerable',count:FORESTS.filter(f=>f.critical).length},
@@ -385,23 +526,44 @@ function renderList(){
     </div>`;
   }).join('');
 }
+
 function flyTo(idx){
   activeCard=idx;
-  if(geoLayers[idx]){
-    map.flyToBounds(geoLayers[idx].getBounds(),{padding:[80,80],duration:1.2,maxZoom:12});
-    setTimeout(()=>geoLayers[idx].eachLayer(l=>l.openPopup()),800);
+  const f=FORESTS[idx];
+  if(featureBounds[idx]){
+    const bb=featureBounds[idx];
+    map.fitBounds(bb,{padding:{top:80,bottom:80,left:sidebarOpen?440:80,right:80},duration:1800,maxZoom:12});
+    // Show popup after fly
+    setTimeout(()=>{
+      if(currentPopup)currentPopup.remove();
+      const center=featureCentroids[idx];
+      currentPopup=new maplibregl.Popup({maxWidth:'340px',closeButton:true})
+        .setLngLat(center)
+        .setHTML(popupHTML(f))
+        .addTo(map);
+    },1200);
   }
   renderList();
 }
+
+/* ---- Layer toggle ---- */
 function renderLayerControl(){
   let h='<h4>Map Layers</h4>';
-  Object.keys(layers).forEach(k=>{
+  Object.keys(layerState).forEach(k=>{
     const on=layerState[k];
     h+=`<div class="layer-row ${on?'':'off'}" onclick="toggleLayer('${k}')"><div class="layer-dot" style="background:${COLORS[k]};box-shadow:0 0 8px ${COLORS[k]}66"></div><span class="layer-label">${CAT_LABELS[k]}</span></div>`;
   });
   document.getElementById('layer-control').innerHTML=h;
 }
-function toggleLayer(k){layerState[k]=!layerState[k];if(layerState[k])map.addLayer(layers[k]);else map.removeLayer(layers[k]);renderLayerControl()}
+function toggleLayer(k){
+  layerState[k]=!layerState[k];
+  const vis=layerState[k]?'visible':'none';
+  try{
+    map.setLayoutProperty('eco-fill-'+k,'visibility',vis);
+    map.setLayoutProperty('eco-line-'+k,'visibility',vis);
+  }catch(e){}
+  renderLayerControl();
+}
 </script>
 </body>
 </html>
