@@ -28,8 +28,8 @@
     --font-mono: 'JetBrains Mono', monospace;
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--bg-deep); color:var(--text-primary); font-family:var(--font-body); overflow:hidden; height:100vh; }
-  #map { position:absolute; inset:0; z-index:1; }
+  body { background:#030504; color:var(--text-primary); font-family:var(--font-body); overflow:hidden; height:100vh; }
+  #map { position:absolute; inset:0; z-index:1; background:#030504; }
 
   /* MapLibre overrides */
   .maplibregl-ctrl-group { background:var(--bg-panel)!important; border:1px solid var(--border)!important; border-radius:8px!important; overflow:hidden; }
@@ -45,7 +45,7 @@
   .maplibregl-popup-close-button:hover { color:var(--text-primary)!important; background:transparent!important; }
 
   /* Loading */
-  #loading { position:fixed; inset:0; z-index:9999; background:var(--bg-deep); display:flex; flex-direction:column; align-items:center; justify-content:center; transition:opacity .6s; }
+  #loading { position:fixed; inset:0; z-index:9999; background:#030504; display:flex; flex-direction:column; align-items:center; justify-content:center; transition:opacity .6s; }
   #loading.hidden { opacity:0; pointer-events:none; }
   .loader-ring { width:52px; height:52px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--accent-green); animation:spin 1s linear infinite; }
   @keyframes spin { to{transform:rotate(360deg)} }
@@ -292,23 +292,37 @@ const map = new maplibregl.Map({
     layers:[{id:'carto-base',type:'raster',source:'carto-dark'}]
   },
   center:[20,10],
-  zoom:2,
-  minZoom:1.5,
+  zoom:1.1,
+  minZoom:0.8,
   maxZoom:15,
   projection:{type:'globe'},
   attributionControl:true
 });
 map.addControl(new maplibregl.NavigationControl({showCompass:true}),'top-right');
 
-/* Atmosphere / sky for the globe */
+/* Atmosphere / sky for the globe — thick glow so it reads as a ball */
 map.on('style.load',()=>{
   map.setFog({
-    color:'rgba(10,15,12,1)',
-    'high-color':'rgba(20,50,35,1)',
-    'horizon-blend':0.03,
-    'space-color':'#060908',
-    'star-intensity':0.55
+    color:'rgba(12,20,16,1)',
+    'high-color':'rgba(30,80,55,1)',
+    'horizon-blend':0.08,
+    'space-color':'#030504',
+    'star-intensity':0.8
   });
+});
+
+/* Gentle auto-spin — stops on any interaction */
+let spinning = true;
+function spinGlobe(){
+  if(!spinning) return;
+  const center = map.getCenter();
+  center.lng += 0.15;
+  map.setCenter(center);
+  requestAnimationFrame(spinGlobe);
+}
+map.on('load',()=>{ spinGlobe(); });
+['mousedown','touchstart','wheel','dblclick'].forEach(ev=>{
+  map.on(ev,()=>{ spinning=false; });
 });
 
 /* ---- Bounding box helper ---- */
@@ -528,6 +542,7 @@ function renderList(){
 }
 
 function flyTo(idx){
+  spinning=false;
   activeCard=idx;
   const f=FORESTS[idx];
   if(featureBounds[idx]){
